@@ -428,6 +428,7 @@ import { FileDropOverlay } from "./FileDropOverlay";
 import { ViewportStatusBorder } from "./ViewportStatusFrame/ViewportStatusFrame";
 import LayerUI from "./LayerUI";
 import { ElementCanvasButton } from "./MagicButton";
+import { FlowchartControls } from "./FlowchartControls";
 import { SVGLayer } from "./SVGLayer";
 import Spinner from "./Spinner";
 import { searchItemInFocusAtom } from "./SearchMenu";
@@ -2704,6 +2705,15 @@ class App extends React.Component<AppProps, AppState> {
                             onPointerDown={this.handleCanvasPointerDown}
                             onDoubleClick={this.handleCanvasDoubleClick}
                           />
+                          {this.isDefaultUIEnabled() &&
+                            this.isInteractionEnabled() &&
+                            selectedElements.length === 1 && (
+                              <FlowchartControls
+                                app={this}
+                                appState={this.state}
+                                element={selectedElements[0]}
+                              />
+                            )}
                           {this.props.viewportStatusFrame?.border &&
                             this.editorInterface.formFactor === "phone" && (
                               <ViewportStatusBorder

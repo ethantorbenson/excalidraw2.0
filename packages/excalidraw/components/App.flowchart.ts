@@ -44,6 +44,46 @@ export class AppFlowchart {
     return this.creator.isCreatingChart;
   }
 
+  /**
+   * Creates one flowchart node from the current selection. The directional
+   * canvas controls use this entry point so pointer creation shares the same
+   * placement, style cloning, bindings, and history behavior as Ctrl+Arrow.
+   */
+  createNodeFromSelection = (direction: LinkDirection) => {
+    const selectedElements = getSelectedElements(
+      this.app.scene.getNonDeletedElementsMap(),
+      this.app.state,
+    );
+
+    if (
+      selectedElements.length !== 1 ||
+      !isFlowchartNodeElement(selectedElements[0])
+    ) {
+      return false;
+    }
+
+    this.creator.clear();
+    this.creator.createNodes(
+      selectedElements[0],
+      this.app.state,
+      direction,
+      this.app.scene,
+    );
+    const nodes = this.creator.pendingNodes ?? [];
+    this.creator.clear();
+
+    if (!nodes.length) {
+      return false;
+    }
+
+    this.app.insertNewElements(nodes);
+    if (isFlowchartNodeElement(nodes[0])) {
+      this.selectAndReveal(nodes[0]);
+    }
+    this.captureUpdate();
+    return true;
+  };
+
   /** ends any in-progress flowchart creation/navigation session */
   clear = () => {
     this.creator.clear();

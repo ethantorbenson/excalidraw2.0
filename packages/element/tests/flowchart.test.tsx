@@ -157,6 +157,38 @@ describe("flow chart creation", () => {
     expect(secondChildNode.x).toBe(thirdChildNode.x);
   });
 
+  it("creates a connected shape from a side control in one undo step", () => {
+    const initialNode = h.elements[0];
+    h.app.scheduleCapture();
+    API.setSelectedElements([initialNode] as NonDeletedExcalidrawElement[]);
+
+    UI.clickByTitle("Add shape (Ctrl+→)");
+
+    expect(h.elements).toHaveLength(3);
+    const createdNode = h.elements.find(
+      (element) =>
+        element.type === "rectangle" && element.id !== initialNode.id,
+    )!;
+    const bindingArrow = h.elements.find(
+      (element) => element.type === "arrow",
+    )!;
+
+    expect(createdNode).toMatchObject({
+      x: initialNode.x + initialNode.width + 100,
+      y: initialNode.y,
+      strokeColor: initialNode.strokeColor,
+      backgroundColor: initialNode.backgroundColor,
+    });
+    expect(bindingArrow).toMatchObject({
+      startBinding: { elementId: initialNode.id },
+      endBinding: { elementId: createdNode.id },
+    });
+    expect(Object.keys(h.state.selectedElementIds)).toEqual([createdNode.id]);
+
+    Keyboard.undo();
+    expect(h.scene.getNonDeletedElements()).toHaveLength(1);
+  });
+
   // regression for #8518: additional siblings must not overlap existing ones
   it("does not overlap existing siblings when adding more children (down)", () => {
     API.clearSelection();
