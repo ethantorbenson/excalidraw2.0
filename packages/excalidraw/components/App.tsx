@@ -238,6 +238,7 @@ import {
   isEligibleFrameChildType,
   getBindingStrategyForDraggingBindingElementEndpoints,
   isNonDeletedElement,
+  isFlowchartNodeElement,
 } from "@excalidraw/element";
 
 import type { GlobalPoint, LocalPoint } from "@excalidraw/math";
@@ -2301,6 +2302,111 @@ class App extends React.Component<AppProps, AppState> {
     });
   };
 
+  private renderFlowchartHandles = () => {
+    const selectedElements = this.scene.getSelectedElements(this.state);
+    if (
+      selectedElements.length !== 1 ||
+      this.state.viewModeEnabled ||
+      this.state.isResizing ||
+      this.state.selectedElementsAreBeingDragged ||
+      this.state.editingTextElement ||
+      this.state.newElement ||
+      this.state.selectionElement
+    ) {
+      return null;
+    }
+
+    const [element] = selectedElements;
+    if (
+      !isFlowchartNodeElement(element) ||
+      (element.type !== "rectangle" && element.type !== "diamond")
+    ) {
+      return null;
+    }
+
+    const zoom = this.state.zoom.value;
+    const width = element.width * zoom;
+    const height = element.height * zoom;
+    if (width < 40 || height < 40) {
+      return null;
+    }
+
+    const { x, y } = sceneCoordsToViewportCoords(
+      { sceneX: element.x, sceneY: element.y },
+      this.state,
+    );
+    const left = x - this.state.offsetLeft;
+    const top = y - this.state.offsetTop;
+    const screenWidth = width;
+    const screenHeight = height;
+    const handleSize = 12;
+    const gap = 20;
+    const handles: {
+      direction: "up" | "right" | "down" | "left";
+      left: number;
+      top: number;
+    }[] = [
+      {
+        direction: "up",
+        left: left + screenWidth / 2 - handleSize / 2,
+        top: top - gap - handleSize,
+      },
+      {
+        direction: "right",
+        left: left + screenWidth + gap,
+        top: top + screenHeight / 2 - handleSize / 2,
+      },
+      {
+        direction: "down",
+        left: left + screenWidth / 2 - handleSize / 2,
+        top: top + screenHeight + gap,
+      },
+      {
+        direction: "left",
+        left: left - gap - handleSize,
+        top: top + screenHeight / 2 - handleSize / 2,
+      },
+    ];
+
+    return (
+      <div
+        className="flowchart-handles"
+        aria-label="Create connected flowchart node"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 3,
+        }}
+      >
+        {handles.map(({ direction, left: handleLeft, top: handleTop }) => (
+          <button
+            aria-label={`Create node ${direction}`}
+            className="flowchart-handle"
+            data-testid={`flowchart-handle-${direction}`}
+            key={direction}
+            style={{
+              position: "absolute",
+              left: handleLeft,
+              top: handleTop,
+              width: handleSize,
+              height: handleSize,
+              pointerEvents: "auto",
+            }}
+            type="button"
+            onPointerDown={(event) =>
+              this.flowchart.beginPointerCreation(
+                element,
+                direction,
+                event.nativeEvent,
+              )
+            }
+          />
+        ))}
+      </div>
+    );
+  };
+
   private toggleOverscrollBehavior = (event: React.PointerEvent) => {
     // when pointer inside editor, disable overscroll behavior to prevent
     // panning to trigger history back/forward on MacOS Chrome
@@ -2704,6 +2810,7 @@ class App extends React.Component<AppProps, AppState> {
                             onPointerDown={this.handleCanvasPointerDown}
                             onDoubleClick={this.handleCanvasDoubleClick}
                           />
+                          {this.renderFlowchartHandles()}
                           {this.props.viewportStatusFrame?.border &&
                             this.editorInterface.formFactor === "phone" && (
                               <ViewportStatusBorder

@@ -1,15 +1,20 @@
-import { KEYS, reseed } from "@excalidraw/common";
+import { KEYS, reseed, toBrandedType } from "@excalidraw/common";
 
 import { Excalidraw } from "@excalidraw/excalidraw";
+import { StoreSnapshot } from "@excalidraw/element";
 
 import { API } from "@excalidraw/excalidraw/tests/helpers/api";
 import { UI, Keyboard, Pointer } from "@excalidraw/excalidraw/tests/helpers/ui";
 import {
+  fireEvent,
   render,
   unmountComponent,
 } from "@excalidraw/excalidraw/tests/test-utils";
 
-import type { NonDeletedExcalidrawElement } from "@excalidraw/element/types";
+import type {
+  NonDeletedExcalidrawElement,
+  SceneElementsMap,
+} from "@excalidraw/element/types";
 
 unmountComponent();
 
@@ -43,6 +48,101 @@ describe("flow chart creation", () => {
 
     API.setElements([rectangle]);
     API.setSelectedElements([rectangle]);
+  });
+
+  it("shows directional handles and creates a node on a plain click", () => {
+    h.app.store.snapshot = StoreSnapshot.create(
+      toBrandedType<SceneElementsMap>(
+        new Map(h.app.scene.getElementsMapIncludingDeleted()),
+      ),
+      h.state,
+    );
+    const handle = document.querySelector<HTMLButtonElement>(
+      '[data-testid="flowchart-handle-right"]',
+    );
+    expect(handle).toBeTruthy();
+
+    fireEvent.pointerDown(handle!, {
+      button: 0,
+      pointerId: 1,
+      clientX: 214,
+      clientY: 50,
+    });
+    fireEvent.pointerUp(window, {
+      pointerId: 1,
+      clientX: 214,
+      clientY: 50,
+    });
+
+    const nodes = h.elements.filter((element) => element.type === "rectangle");
+    expect(nodes).toHaveLength(2);
+    expect(nodes[1]).toMatchObject({ x: 300, y: 0 });
+    expect(
+      h.elements.find((element) => element.type === "arrow"),
+    ).toMatchObject({
+      startBinding: { elementId: nodes[0].id },
+      endBinding: { elementId: nodes[1].id },
+    });
+    expect(h.state.selectedElementIds[nodes[1].id]).toBe(true);
+
+    expect(API.getUndoStack()).toHaveLength(1);
+    expect(API.getUndoStack()[0].elements.isEmpty()).toBe(false);
+    Keyboard.undo();
+    expect(h.elements.filter((element) => !element.isDeleted)).toHaveLength(1);
+  });
+
+  it("follows the pointer while dragging and cancels on Escape", () => {
+    const handle = document.querySelector<HTMLButtonElement>(
+      '[data-testid="flowchart-handle-right"]',
+    );
+    expect(handle).toBeTruthy();
+
+    fireEvent.pointerDown(handle!, {
+      button: 0,
+      pointerId: 1,
+      clientX: 214,
+      clientY: 50,
+    });
+    fireEvent.pointerMove(window, {
+      pointerId: 1,
+      clientX: 700,
+      clientY: 500,
+    });
+
+    const previewNode = h.app.flowchart.pendingNodes?.find(
+      (element) => element.type === "rectangle",
+    );
+    expect(previewNode).toMatchObject({ x: 600, y: 450 });
+
+    fireEvent.keyDown(window, { key: KEYS.ESCAPE });
+    expect(h.app.flowchart.pendingNodes).toBeNull();
+    expect(h.elements).toHaveLength(1);
+  });
+
+  it("cancels a dragged node when released back over its source", () => {
+    const handle = document.querySelector<HTMLButtonElement>(
+      '[data-testid="flowchart-handle-right"]',
+    );
+    expect(handle).toBeTruthy();
+
+    fireEvent.pointerDown(handle!, {
+      button: 0,
+      pointerId: 1,
+      clientX: 214,
+      clientY: 50,
+    });
+    fireEvent.pointerMove(window, {
+      pointerId: 1,
+      clientX: 700,
+      clientY: 500,
+    });
+    fireEvent.pointerUp(window, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 50,
+    });
+
+    expect(h.elements).toHaveLength(1);
   });
 
   // multiple at once

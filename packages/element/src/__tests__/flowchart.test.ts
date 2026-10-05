@@ -3,11 +3,52 @@ import { ROUNDNESS } from "@excalidraw/common";
 import type { AppState } from "@excalidraw/excalidraw/types";
 
 import { Scene } from "../Scene";
-import { addNewNodes } from "../flowchart";
-import { newStickyNoteElement } from "../newElement";
+import { addNewNodes, createFlowchartNodesAtPosition } from "../flowchart";
+import { newElement, newStickyNoteElement } from "../newElement";
 import { isFlowchartNodeElement, isStickyNoteElement } from "../typeChecks";
 
 describe("flowchart", () => {
+  it("creates a connected node at a requested position", () => {
+    const rectangle = newElement({
+      type: "rectangle",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+      backgroundColor: "#aabbcc",
+      strokeColor: "#123456",
+    });
+    if (!isFlowchartNodeElement(rectangle)) {
+      throw new Error("Expected a flowchart node");
+    }
+    const scene = new Scene([rectangle], { skipValidation: true });
+    const [nextNode, bindingArrow] = createFlowchartNodesAtPosition(
+      rectangle,
+      {
+        currentItemEndArrowhead: "arrow",
+      } as AppState,
+      "right",
+      scene,
+      500,
+      250,
+    );
+
+    expect(nextNode).toMatchObject({
+      type: "rectangle",
+      x: 500,
+      y: 250,
+      width: rectangle.width,
+      height: rectangle.height,
+      backgroundColor: rectangle.backgroundColor,
+      strokeColor: rectangle.strokeColor,
+    });
+    expect(bindingArrow).toMatchObject({
+      type: "arrow",
+      startBinding: { elementId: rectangle.id },
+      endBinding: { elementId: nextNode.id },
+    });
+  });
+
   it("creates connected sticky notes", () => {
     const sticky = newStickyNoteElement({
       type: "stickynote",

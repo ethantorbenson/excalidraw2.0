@@ -1,4 +1,5 @@
 import path from "path";
+
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import svgrPlugin from "vite-plugin-svgr";
@@ -7,6 +8,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import checker from "vite-plugin-checker";
 import { createHtmlPlugin } from "vite-plugin-html";
 import Sitemap from "vite-plugin-sitemap";
+
 import { woff2BrowserPlugin } from "../scripts/woff2/woff2-vite-plugins";
 export default defineConfig(({ mode }) => {
   // To load .env variables
@@ -14,6 +16,8 @@ export default defineConfig(({ mode }) => {
   // https://vitejs.dev/config/
   return {
     server: {
+      host: "0.0.0.0",
+      allowedHosts: true,
       port: Number(envVars.VITE_APP_PORT || 3000),
       // open the browser
       open: true,
