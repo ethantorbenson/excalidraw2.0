@@ -1,0 +1,95 @@
+@use "../css/variables.module" as *;
+
+.excalidraw {
+  .excalidraw-flowchartAddStep {
+    position: relative;
+  }
+
+  .excalidraw-flowchartAddStep__trigger {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--border-radius-md);
+    color: var(--icon-fill-color);
+    background: transparent;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible,
+    &[aria-expanded="true"] {
+      background: var(--button-hover-bg);
+    }
+  }
+
+  .excalidraw-flowchartAddStep__plus {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+  }
+
+  .excalidraw-flowchartAddStep__picker {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 0.5rem);
+    z-index: var(--zIndex-canvasButtons);
+    display: grid;
+    grid-template: repeat(3, 2rem) / repeat(3, 2rem);
+    place-items: center;
+    padding: 0.25rem;
+    transform: translateY(-50%);
+    border: 1px solid var(--default-border-color);
+    border-radius: var(--border-radius-lg);
+    background: var(--island-bg-color);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+  }
+
+  .excalidraw-flowchartAddStep__picker--left {
+    right: calc(100% + 0.5rem);
+    left: auto;
+  }
+
+  .excalidraw-flowchartAddStep__direction {
+    display: grid;
+    place-items: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--border-radius-md);
+    color: var(--text-primary-color);
+    background: transparent;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible,
+    &[aria-pressed="true"] {
+      color: var(--color-primary);
+      background: var(--button-hover-bg);
+      outline: none;
+    }
+  }
+
+  .excalidraw-flowchartAddStep__direction--up {
+    grid-area: 1 / 2;
+  }
+
+  .excalidraw-flowchartAddStep__direction--right {
+    grid-area: 2 / 3;
+  }
+
+  .excalidraw-flowchartAddStep__direction--down {
+    grid-area: 3 / 2;
+  }
+
+  .excalidraw-flowchartAddStep__direction--left {
+    grid-area: 2 / 1;
+  }
+}

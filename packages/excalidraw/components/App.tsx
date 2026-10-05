@@ -389,6 +389,7 @@ import {
   getViewportForZoomWithScrollConstraints,
 } from "../viewport";
 import { ElementCanvasButtons } from "../components/ElementCanvasButtons";
+import { FlowchartAddStep } from "../components/FlowchartAddStep";
 import { LaserTrails } from "../laserTrails";
 import { withBatchedUpdates, withBatchedUpdatesThrottled } from "../reactUtils";
 import { isOverScrollBars } from "../scene/scrollbars";
@@ -2510,6 +2511,39 @@ class App extends React.Component<AppProps, AppState> {
                                 setToast={this.setToast}
                                 updateEmbedValidationStatus={
                                   this.updateEmbedValidationStatus
+                                }
+                              />
+                            )}
+                          {this.isDefaultUIEnabled() &&
+                            this.isInteractionEnabled() &&
+                            !this.state.viewModeEnabled &&
+                            this.state.activeTool.type === "selection" &&
+                            this.state.zoom.value >= 0.55 &&
+                            !this.state.contextMenu &&
+                            !this.state.selectedElementsAreBeingDragged &&
+                            !this.state.resizingElement &&
+                            !this.state.isResizing &&
+                            !this.state.isRotating &&
+                            !this.state.editingTextElement &&
+                            !this.state.selectionElement &&
+                            !this.state.showHyperlinkPopup &&
+                            selectedElements.length === 1 &&
+                            (firstSelectedElement.type === "rectangle" ||
+                              firstSelectedElement.type === "diamond") && (
+                              <FlowchartAddStep
+                                element={firstSelectedElement}
+                                elementsMap={renderableElementsMap}
+                                onPreview={(direction) =>
+                                  this.flowchart.previewAddStep(
+                                    firstSelectedElement,
+                                    direction,
+                                  )
+                                }
+                                onCommit={(direction) =>
+                                  this.flowchart.addStep(
+                                    firstSelectedElement,
+                                    direction,
+                                  )
                                 }
                               />
                             )}
