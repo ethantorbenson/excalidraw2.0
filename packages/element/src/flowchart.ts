@@ -449,6 +449,42 @@ const createBindingArrow = (
   };
 };
 
+export const createFlowchartNodesAtPosition = (
+  startNode: NonDeleted<ExcalidrawFlowchartNodeElement>,
+  appState: AppState,
+  direction: LinkDirection,
+  scene: Scene,
+  x: number,
+  y: number,
+): PendingExcalidrawElements => {
+  const node = cloneFlowchartNode(startNode, x, y);
+  const arrow = createBindingArrow(startNode, node, direction, appState, scene);
+  const elements = [node, arrow];
+  const elementsMap = scene.getNonDeletedElementsMap();
+
+  if (startNode.frameId) {
+    const frame = elementsMap.get(startNode.frameId);
+
+    if (
+      frame &&
+      isFrameElement(frame) &&
+      elements.every(
+        (element) =>
+          elementsAreInFrameBounds([element], frame, elementsMap) ||
+          elementOverlapsWithFrame(element, frame, elementsMap),
+      )
+    ) {
+      return elements.map((element) =>
+        mutateElement(element, elementsMap, {
+          frameId: startNode.frameId,
+        }),
+      );
+    }
+  }
+
+  return elements;
+};
+
 export class FlowChartNavigator {
   isExploring: boolean = false;
   // nodes that are ONE link away (successor and predecessor both included)

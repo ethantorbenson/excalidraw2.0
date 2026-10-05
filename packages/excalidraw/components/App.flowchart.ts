@@ -1,4 +1,9 @@
-import { isArrowKey, KEYS } from "@excalidraw/common";
+import {
+  isArrowKey,
+  KEYS,
+  sceneCoordsToViewportCoords,
+  viewportCoordsToSceneCoords,
+} from "@excalidraw/common";
 
 import {
   makeNextSelectedElementIds,
@@ -7,11 +12,15 @@ import {
   FlowChartNavigator,
   getSelectedElements,
   isFlowchartNodeElement,
+  addNewNodes,
+  createFlowchartNodesAtPosition,
   type LinkDirection,
 } from "@excalidraw/element";
 
 import type {
   ExcalidrawElement,
+  ExcalidrawFlowchartNodeElement,
+  NonDeleted,
   NonDeletedExcalidrawElement,
 } from "@excalidraw/element/types";
 
@@ -27,30 +36,250 @@ type FlowchartOperation =
   | { type: "committed"; nodes: PendingExcalidrawElements }
   | { type: "navigationEnded" };
 
+type PointerCreationSession = {
+  startNode: NonDeleted<ExcalidrawFlowchartNodeElement>;
+  direction: LinkDirection;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  didDrag: boolean;
+  defaultNodes: PendingExcalidrawElements;
+  defaultPosition: { x: number; y: number };
+  pendingNodes: PendingExcalidrawElements;
+};
+
 /**
  * Captures the App state management for the flowchart functionality.
  */
 export class AppFlowchart {
   private creator = new FlowChartCreator();
   private navigator = new FlowChartNavigator();
+  private pointerCreationSession: PointerCreationSession | null = null;
 
   constructor(private app: App) {}
 
   get pendingNodes() {
-    return this.creator.pendingNodes;
+    return (
+      this.pointerCreationSession?.pendingNodes ?? this.creator.pendingNodes
+    );
   }
 
   get isCreatingChart() {
-    return this.creator.isCreatingChart;
+    return this.creator.isCreatingChart || !!this.pointerCreationSession;
   }
 
   /** ends any in-progress flowchart creation/navigation session */
   clear = () => {
+    this.clearPointerCreation();
     this.creator.clear();
     this.navigator.clear();
   };
 
+  beginPointerCreation = (
+    startNode: NonDeleted<ExcalidrawFlowchartNodeElement>,
+    direction: LinkDirection,
+    event: PointerEvent,
+  ) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    this.clearPointerCreation();
+    event.preventDefault();
+    event.stopPropagation();
+
+    const defaultNodes = addNewNodes(
+      startNode,
+      this.app.state,
+      direction,
+      this.app.scene,
+      1,
+    ).nodes;
+    const defaultNode = defaultNodes.find(isFlowchartNodeElement);
+    if (!defaultNode) {
+      return;
+    }
+
+    this.pointerCreationSession = {
+      startNode,
+      direction,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      didDrag: false,
+      defaultNodes,
+      defaultPosition: { x: defaultNode.x, y: defaultNode.y },
+      pendingNodes: defaultNodes,
+    };
+
+    this.app.ownerWindow.addEventListener(
+      "pointermove",
+      this.handlePointerCreationMove,
+      true,
+    );
+    this.app.ownerWindow.addEventListener(
+      "pointerup",
+      this.handlePointerCreationUp,
+      true,
+    );
+    this.app.ownerWindow.addEventListener(
+      "pointercancel",
+      this.handlePointerCreationCancel,
+      true,
+    );
+    this.app.ownerWindow.addEventListener(
+      "keydown",
+      this.handlePointerCreationKeyDown,
+      true,
+    );
+    this.app.triggerRender(true);
+  };
+
+  private handlePointerCreationMove = (event: PointerEvent) => {
+    const session = this.pointerCreationSession;
+    if (!session || event.pointerId !== session.pointerId) {
+      return;
+    }
+
+    const distanceFromStart = Math.hypot(
+      event.clientX - session.startClientX,
+      event.clientY - session.startClientY,
+    );
+    if (!session.didDrag && distanceFromStart < 4) {
+      return;
+    }
+
+    session.didDrag = true;
+    const pointer = viewportCoordsToSceneCoords(event, this.app.state);
+    const defaultCenter = sceneCoordsToViewportCoords(
+      {
+        sceneX: session.defaultPosition.x + session.startNode.width / 2,
+        sceneY: session.defaultPosition.y + session.startNode.height / 2,
+      },
+      this.app.state,
+    );
+    const snapsToDefault =
+      Math.hypot(
+        event.clientX - defaultCenter.x,
+        event.clientY - defaultCenter.y,
+      ) < 24;
+
+    session.pendingNodes = snapsToDefault
+      ? session.defaultNodes
+      : createFlowchartNodesAtPosition(
+          session.startNode,
+          this.app.state,
+          session.direction,
+          this.app.scene,
+          pointer.x - session.startNode.width / 2,
+          pointer.y - session.startNode.height / 2,
+        );
+    event.preventDefault();
+    this.app.triggerRender(true);
+  };
+
+  private handlePointerCreationUp = (event: PointerEvent) => {
+    const session = this.pointerCreationSession;
+    if (!session || event.pointerId !== session.pointerId) {
+      return;
+    }
+
+    this.handlePointerCreationMove(event);
+    const currentSession = this.pointerCreationSession;
+    if (!currentSession) {
+      return;
+    }
+
+    const pointer = viewportCoordsToSceneCoords(event, this.app.state);
+    const isOverSource =
+      pointer.x >= currentSession.startNode.x &&
+      pointer.x <=
+        currentSession.startNode.x + currentSession.startNode.width &&
+      pointer.y >= currentSession.startNode.y &&
+      pointer.y <= currentSession.startNode.y + currentSession.startNode.height;
+    const isNearStart =
+      Math.hypot(
+        event.clientX - currentSession.startClientX,
+        event.clientY - currentSession.startClientY,
+      ) < 12;
+
+    if (currentSession.didDrag && (isOverSource || isNearStart)) {
+      this.cancelPointerCreation();
+      return;
+    }
+
+    const nodes = currentSession.pendingNodes;
+    this.clearPointerCreation();
+    this.app.insertNewElements(nodes);
+
+    const firstNode = nodes.find(isFlowchartNodeElement);
+    if (firstNode) {
+      this.selectAndReveal(firstNode);
+    }
+
+    this.captureUpdate();
+  };
+
+  private handlePointerCreationCancel = (event: PointerEvent) => {
+    if (
+      this.pointerCreationSession &&
+      event.pointerId === this.pointerCreationSession.pointerId
+    ) {
+      this.cancelPointerCreation();
+    }
+  };
+
+  private handlePointerCreationKeyDown = (event: KeyboardEvent) => {
+    if (event.key === KEYS.ESCAPE) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.cancelPointerCreation();
+    }
+  };
+
+  private cancelPointerCreation = () => {
+    this.clearPointerCreation();
+    this.app.triggerRender(true);
+  };
+
+  private clearPointerCreation = () => {
+    if (!this.pointerCreationSession) {
+      return;
+    }
+
+    this.app.ownerWindow.removeEventListener(
+      "pointermove",
+      this.handlePointerCreationMove,
+      true,
+    );
+    this.app.ownerWindow.removeEventListener(
+      "pointerup",
+      this.handlePointerCreationUp,
+      true,
+    );
+    this.app.ownerWindow.removeEventListener(
+      "pointercancel",
+      this.handlePointerCreationCancel,
+      true,
+    );
+    this.app.ownerWindow.removeEventListener(
+      "keydown",
+      this.handlePointerCreationKeyDown,
+      true,
+    );
+    this.pointerCreationSession = null;
+  };
+
   handleKeyEvent = (event: React.KeyboardEvent | KeyboardEvent): boolean => {
+    if (
+      this.pointerCreationSession &&
+      event.type === "keydown" &&
+      event.key === KEYS.ESCAPE
+    ) {
+      this.cancelPointerCreation();
+      return true;
+    }
+
     const operation = this.resolveKeyboardEventToOperation(event);
 
     switch (operation.type) {

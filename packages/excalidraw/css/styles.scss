@@ -1080,3 +1080,23 @@ body.excalidraw-cursor-resize * {
     font-family: "Assistant";
   }
 }
+
+.excalidraw .flowchart-handle {
+  box-sizing: border-box;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #6965db;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: crosshair;
+  transition: transform 100ms ease;
+
+  &:hover {
+    transform: scale(1.25);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
